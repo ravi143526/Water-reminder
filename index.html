@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Sip: Water Reminder</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#1a73e8">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Sip">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#e9f3f2;--surface:#fff;--ink:#0d2b33;--mute:#5b7a82;--line:#cfe2e1;--water:#1a73e8;--water2:#7cc4ff;--warn:#e8590c;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0a1a20;--surface:#12272f;--ink:#e6f3f5;--mute:#8fb0b8;--line:#21404a;--water:#4c9aff;--water2:#1d5fa8}}
+:root[data-theme="dark"]{--bg:#0a1a20;--surface:#12272f;--ink:#e6f3f5;--mute:#8fb0b8;--line:#21404a;--water:#4c9aff;--water2:#1d5fa8}
+*{box-sizing:border-box}html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:'Bricolage Grotesque',system-ui,sans-serif;line-height:1.4}
+main{max-width:460px;margin:0 auto;padding:20px 18px 40px}
+h1{font-size:1.5rem;font-weight:800;margin:0 0 2px}
+.sub{color:var(--mute);margin:0 0 18px;font-size:.95rem}
+.glass{position:relative;width:190px;height:230px;margin:6px auto 14px;border:3px solid var(--ink);border-top-width:0;border-radius:6px 6px 38px 38px/6px 6px 30px 30px;overflow:hidden;background:var(--surface)}
+.fill{position:absolute;left:0;right:0;bottom:0;height:0;background:linear-gradient(var(--water2),var(--water));transition:height .7s cubic-bezier(.3,.8,.3,1)}
+.fill::before{content:"";position:absolute;left:-10%;right:-10%;top:-8px;height:16px;border-radius:50%;background:var(--water2)}
+.count{position:absolute;inset:0;display:grid;place-items:center;font-size:3rem;font-weight:800;color:var(--ink);mix-blend-mode:normal;text-shadow:0 0 12px var(--surface),0 0 4px var(--surface)}
+.count small{display:block;font-size:.85rem;font-weight:600;color:var(--mute);text-align:center}
+.row{display:flex;gap:10px}.row>*{flex:1}
+button,select,input{font:inherit;color:inherit}
+.btn{border:0;border-radius:14px;padding:14px;font-weight:600;font-size:1rem;background:var(--water);color:#fff;cursor:pointer}
+.btn.alt{background:var(--surface);color:var(--ink);border:1.5px solid var(--line)}
+.btn.stop{background:var(--warn)}
+.btn:focus-visible,select:focus-visible,input:focus-visible{outline:3px solid var(--water2);outline-offset:2px}
+.card{background:var(--surface);border:1.5px solid var(--line);border-radius:16px;padding:14px 16px;margin-top:14px}
+.next{display:flex;justify-content:space-between;align-items:baseline}
+.next b{font-size:1.6rem;font-variant-numeric:tabular-nums}
+.set{display:grid;gap:12px}
+label{display:grid;gap:5px;font-size:.88rem;color:var(--mute);font-weight:600}
+select,input[type=number],input[type=time]{width:100%;padding:11px;border-radius:10px;border:1.5px solid var(--line);background:var(--bg)}
+.tog{display:flex;justify-content:space-between;align-items:center;color:var(--ink);font-size:1rem}
+.tog input{width:22px;height:22px}
+.note{font-size:.82rem;color:var(--mute);margin:8px 0 0}
+#alert{position:fixed;inset:0;background:rgba(5,20,30,.78);display:none;place-items:center;padding:24px;z-index:9}
+#alert.on{display:grid}
+#alert .box{background:var(--surface);border-radius:22px;padding:26px;text-align:center;max-width:340px;width:100%}
+#alert h2{margin:0 0 6px;font-size:1.6rem}
+#alert .row{margin-top:16px}
+@media (prefers-reduced-motion:reduce){.fill{transition:none}}
+</style>
+</head>
+<body>
+<main>
+  <h1>Sip</h1>
+  <p class="sub" id="sub">Stay on top of your water today.</p>
+
+  <div class="glass"><div class="fill" id="fill"></div><div class="count"><div><span id="n">0</span><small id="goalTxt">of 8 glasses</small></div></div></div>
+
+  <div class="row">
+    <button class="btn" id="drink">I drank a glass</button>
+    <button class="btn alt" id="undo">Undo</button>
+  </div>
+
+  <div class="card">
+    <div class="next"><span style="color:var(--mute)" id="nextLbl">Reminders are off</span><b id="cd">–</b></div>
+    <div class="row" style="margin-top:12px">
+      <button class="btn" id="toggle">Start reminders</button>
+      <button class="btn alt" id="test">Test alert</button>
+    </div>
+    <p class="note" id="status"></p>
+  </div>
+
+  <div class="card set">
+    <label>Remind me every (minutes)<input type="number" id="interval" min="1" max="480" value="60"></label>
+    <div class="row">
+      <label>From<input type="time" id="from" value="08:00"></label>
+      <label>Until<input type="time" id="to" value="22:00"></label>
+    </div>
+    <label>Daily goal (glasses)<input type="number" id="goal" min="1" max="30" value="8"></label>
+    <label>Sound
+      <select id="sound">
+        <option value="drop">Droplet</option><option value="chime">Chime</option><option value="bell">Bell</option><option value="custom">My own sound</option>
+      </select>
+    </label>
+    <label id="customWrap" hidden>Choose an audio file<input type="file" id="file" accept="audio/*"></label>
+    <label>Volume<input type="range" id="vol" min="0" max="1" step="0.05" value="0.8"></label>
+    <label>Vibration
+      <select id="vib"><option value="short">Short buzz</option><option value="double">Double buzz</option><option value="long">Long pulse</option><option value="off">Off</option></select>
+    </label>
+    <label class="tog">Show phone notification<input type="checkbox" id="notif" checked></label>
+    <label class="tog">Keep screen awake while running<input type="checkbox" id="wake"></label>
+    <p class="note">Reminders only fire while this page stays open. Vibration works on Android Chrome; iPhones don’t allow web pages to vibrate.</p>
+  </div>
+</main>
+
+<div id="alert"><div class="box"><h2>Time for water</h2><p style="color:var(--mute);margin:0">Take a few sips now.</p>
+  <div class="row"><button class="btn" id="aDrink">I drank</button><button class="btn alt" id="aSnooze">Snooze 10 min</button></div></div></div>
+
+<script>
+const $=id=>document.getElementById(id);
+const PAT={short:[300],double:[250,120,250],long:[700,200,700,200,700]};
+const todayKey=()=>new Date().toISOString().slice(0,10);
+let S={interval:60,from:'08:00',to:'22:00',goal:8,sound:'drop',vol:.8,vib:'short',notif:true,wake:false,custom:null,log:{},running:false,nextAt:0};
+try{Object.assign(S,JSON.parse(localStorage.getItem('sip')||'{}'))}catch(e){}
+const save=()=>{try{localStorage.setItem('sip',JSON.stringify(S))}catch(e){$('status').textContent='Could not save settings. Your custom sound may be too large.'}};
+let ctx,wakeLock=null,audioEl=null,ringing=null;
+
+function count(){return S.log[todayKey()]||0}
+function render(){
+  $('n').textContent=count();$('goalTxt').textContent='of '+S.goal+' glasses';
+  $('fill').style.height=Math.min(100,count()/S.goal*100)+'%';
+  $('toggle').textContent=S.running?'Stop reminders':'Start reminders';
+  $('toggle').className='btn'+(S.running?' stop':'');
+  $('customWrap').hidden=S.sound!=='custom';
+  $('sub').textContent=count()>=S.goal?'Goal reached. Well done.':'Stay on top of your water today.';
+}
+function bind(id,key,num){const e=$(id);e.value=S[key];if(e.type==='checkbox')e.checked=S[key];
+  e.addEventListener('input',()=>{S[key]=e.type==='checkbox'?e.checked:(num?+e.value:e.value);
+    if(key==='interval'&&S.running)schedule();if(key==='wake')setWake();save();render()})}
+bind('interval','interval',1);bind('from','from');bind('to','to');bind('goal','goal',1);bind('sound','sound');bind('vol','vol',1);bind('vib','vib');bind('notif','notif');bind('wake','wake');
+
+$('file').addEventListener('change',e=>{const f=e.target.files[0];if(!f)return;
+  if(f.size>2.5*1024*1024){$('status').textContent='That file is over 2.5 MB. Pick a shorter clip.';return}
+  const r=new FileReader();r.onload=()=>{S.custom=r.result;audioEl=null;save();$('status').textContent='Custom sound saved: '+f.name};r.readAsDataURL(f)});
+
+function tone(freq,t0,dur,type,gain,dest){const o=ctx.createOscillator(),g=ctx.createGain();o.type=type;o.frequency.setValueAtTime(freq,t0);
+  g.gain.setValueAtTime(0,t0);g.gain.linearRampToValueAtTime(gain,t0+.01);g.gain.exponentialRampToValueAtTime(.0001,t0+dur);o.connect(g);g.connect(dest);o.start(t0);o.stop(t0+dur+.05);return o}
+function playSound(){
+  const v=S.vol;
+  if(S.sound==='custom'&&S.custom){if(!audioEl){audioEl=new Audio(S.custom)}audioEl.volume=v;audioEl.currentTime=0;audioEl.play().catch(()=>{});return}
+  ctx=ctx||new (window.AudioContext||window.webkitAudioContext)();ctx.resume();
+  const t=ctx.currentTime,m=ctx.createGain();m.gain.value=v;m.connect(ctx.destination);
+  if(S.sound==='drop'){const o=tone(900,t,.35,'sine',.9,m);o.frequency.exponentialRampToValueAtTime(380,t+.3);const o2=tone(1100,t+.5,.35,'sine',.9,m);o2.frequency.exponentialRampToValueAtTime(450,t+.8)}
+  else if(S.sound==='chime'){[660,880,1320].forEach((f,i)=>tone(f,t+i*.22,.9,'sine',.6,m))}
+  else{[520,1040,1560].forEach((f,i)=>tone(f,t,2,'triangle',.5/(i+1),m))}
+}
+function buzz(){if(S.vib!=='off'&&navigator.vibrate)navigator.vibrate(PAT[S.vib])}
+function fire(){
+  playSound();buzz();$('alert').classList.add('on');
+  clearInterval(ringing);ringing=setInterval(()=>{if($('alert').classList.contains('on')){buzz()}else clearInterval(ringing)},4000);
+  if(S.notif&&'Notification' in window&&Notification.permission==='granted'&&document.hidden){
+    try{navigator.serviceWorker.ready.then(r=>r.showNotification('Time for water',{body:'Take a few sips now.',icon:'icon-192.png',vibrate:PAT[S.vib]||[],tag:'sip',renotify:true}))}catch(e){}}
+}
+function inWindow(ts){const d=new Date(ts),m=d.getHours()*60+d.getMinutes(),p=s=>{const [h,mi]=s.split(':');return +h*60+ +mi};return m>=p(S.from)&&m<=p(S.to)}
+function schedule(min){S.nextAt=Date.now()+(min||S.interval)*60000;save()}
+function tick(){
+  if(!S.running){$('cd').textContent='–';$('nextLbl').textContent='Reminders are off';return}
+  const left=S.nextAt-Date.now();
+  if(left<=0){if(inWindow(Date.now()))fire();schedule();return}
+  const s=Math.ceil(left/1000),h=Math.floor(s/3600),mm=Math.floor(s%3600/60),ss=s%60;
+  $('nextLbl').textContent='Next reminder in';$('cd').textContent=(h?h+':':'')+String(mm).padStart(h?2:1,'0')+':'+String(ss).padStart(2,'0');
+}
+setInterval(tick,1000);document.addEventListener('visibilitychange',()=>{tick();if(S.running&&S.wake&&!document.hidden)setWake()});
+
+async function setWake(){try{if(S.wake&&S.running&&'wakeLock' in navigator){wakeLock=await navigator.wakeLock.request('screen')}else if(wakeLock){await wakeLock.release();wakeLock=null}}catch(e){}}
+$('toggle').onclick=async()=>{
+  S.running=!S.running;
+  if(S.running){
+    ctx=ctx||new (window.AudioContext||window.webkitAudioContext)();ctx.resume();
+    if(S.custom){audioEl=audioEl||new Audio(S.custom);audioEl.muted=true;audioEl.play().then(()=>{audioEl.pause();audioEl.muted=false}).catch(()=>{})}
+    if(S.notif&&'Notification' in window&&Notification.permission==='default'){try{await Notification.requestPermission()}catch(e){}}
+    schedule();$('status').textContent='Running. Keep this page open for alerts.';
+  }else $('status').textContent='';
+  setWake();save();render();tick();
+};
+$('test').onclick=fire;
+const add=n=>{S.log[todayKey()]=Math.max(0,count()+n);save();render()};
+$('drink').onclick=()=>add(1);$('undo').onclick=()=>add(-1);
+const close=()=>{$('alert').classList.remove('on');clearInterval(ringing);if(audioEl)audioEl.pause();navigator.vibrate&&navigator.vibrate(0)};
+$('aDrink').onclick=()=>{close();add(1)};
+$('aSnooze').onclick=()=>{close();if(S.running)schedule(10)};
+if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
+render();tick();
+</script>
+</body>
+</html>
